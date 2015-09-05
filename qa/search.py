@@ -1,12 +1,19 @@
 from django.conf import settings
 
 from elasticsearch_dsl import DocType, Date, String, Nested, Object, Index, \
-    MetaField
+    MetaField, analyzer
 
 # user is repeated in several places, reuse a field definition
 user_field = Object(properties={
     'display_name': String(fields={'raw': String(index='not_analyzed')}),
 })
+
+# create our own analyzer
+html_strip = analyzer('html_strip',
+    tokenizer="standard",
+    filter=["standard", "lowercase", "stop", "snowball"],
+    char_filter=["html_strip"]
+)
 
 class Post(DocType):
     """
@@ -17,7 +24,7 @@ class Post(DocType):
     last_activity_date = Date()
     # have comments as nested type
     comments = Nested(properties={'owner': user_field})
-    body = String()
+    body = String(analyzer=html_strip)
 
 class Question(Post):
     tags = String(index='not_analyzed', multi=True)
@@ -33,4 +40,3 @@ class Answer(Post):
 index = Index(settings.ES_INDEX)
 index.doc_type(Answer)
 index.doc_type(Question)
-
